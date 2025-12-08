@@ -1,0 +1,13 @@
+python load_dbpedia_to_os.py \
+  --hdf5 /mnt/nvme2n1p1/xtang/ann-data/dbpedia-openai-1000k-angular.hdf5 \
+  --os-url http://localhost:9200 \
+  --user admin --password admin \
+  --train-index dbpedia-train \
+  --ivf-index dbpedia-faiss-ivfflat-ip \
+  --max-train 200000 \
+  --max-test 10 \
+  --nlist 2048 \
+  --nprobes 32 \
+  --k 10 \
+  --recreate-train-index \
+  --recreate-ivf-index
