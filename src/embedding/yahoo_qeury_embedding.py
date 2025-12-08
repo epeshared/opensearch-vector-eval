@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Iterable, List, Tuple, Any, Dict
 
-from opensearch.os_embeeding_client import OpenSearchTextEmbedder
+from os_embeeding_client import OpenSearchTextEmbedder
 
 
 def read_queries(jsonl_path: Path, query_field="query", fallback_field="title", id_field="id"):
