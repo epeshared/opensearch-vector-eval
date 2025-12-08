@@ -8,3 +8,7 @@ venv/
 .idea/
 .DS_Store
 output/
+ts_models/
+onnx_models/
+logs/
+checkpoints/
