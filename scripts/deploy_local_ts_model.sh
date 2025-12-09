@@ -74,7 +74,7 @@ PY_INFO=$(
   MODEL_ZIP_PATH="$MODEL_ZIP_PATH" \
   python - << 'PY'
 import os, json, hashlib, zipfile
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig
 
 hf_id = os.environ["HF_MODEL_ID"]
 ts_path = os.environ["LOCAL_TS_PATH"]
@@ -88,35 +88,41 @@ os.makedirs(tok_dir, exist_ok=True)
 
 marker = os.path.join(tok_dir, ".downloaded")
 if not os.path.exists(marker):
-    print(f"[Info] 下载 tokenizer: {hf_id}")
-    tok = AutoTokenizer.from_pretrained(hf_id)
-    tok.save_pretrained(tok_dir)
-    with open(marker, "w") as f:
-        f.write("ok\n")
+  print(f"[Info] 下载 tokenizer: {hf_id}")
+  tok = AutoTokenizer.from_pretrained(hf_id)
+  tok.save_pretrained(tok_dir)
+  with open(marker, "w") as f:
+    f.write("ok\n")
+
+# 1.5) 读取 HF config，用于 TEXT_EMBEDDING all_config
+print("[Info] 加载 HF config 用于 all_config")
+cfg = AutoConfig.from_pretrained(hf_id)
+all_config_json = cfg.to_json_string()
 
 # 2) 打 zip：根目录只放 .pt + tokenizer 的文件
 with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-    # 模型本体
-    zf.write(ts_path, arcname=os.path.basename(ts_path))
-    # tokenizer 文件全部扁平放在根目录
-    for fname in os.listdir(tok_dir):
-        fpath = os.path.join(tok_dir, fname)
-        if os.path.isfile(fpath):
-            zf.write(fpath, arcname=fname)
+  # 模型本体
+  zf.write(ts_path, arcname=os.path.basename(ts_path))
+  # tokenizer 文件全部扁平放在根目录
+  for fname in os.listdir(tok_dir):
+    fpath = os.path.join(tok_dir, fname)
+    if os.path.isfile(fpath):
+      zf.write(fpath, arcname=fname)
 
 # 3) 统计 size + sha256
 size = os.path.getsize(zip_path)
 h = hashlib.sha256()
 with open(zip_path, "rb") as f:
-    for chunk in iter(lambda: f.read(1 << 20), b""):
-        h.update(chunk)
+  for chunk in iter(lambda: f.read(1 << 20), b""):
+    h.update(chunk)
 
-print(json.dumps({"size": size, "sha256": h.hexdigest()}))
+print(json.dumps({"size": size, "sha256": h.hexdigest(), "all_config": all_config_json}))
 PY
 )
 
-MODEL_SIZE_BYTES=$(echo "$PY_INFO" | jq -r '.size')
-MODEL_SHA256=$(echo "$PY_INFO"   | jq -r '.sha256')
+MODEL_SIZE_BYTES=$(echo "$PY_INFO" | tail -n 1 | jq -r '.size')
+MODEL_SHA256=$(echo "$PY_INFO"   | tail -n 1 | jq -r '.sha256')
+MODEL_ALL_CONFIG=$(echo "$PY_INFO" | tail -n 1 | jq -r '.all_config')
 
 echo "[Info] MODEL_ZIP_PATH      = $MODEL_ZIP_PATH"
 echo "[Info] MODEL_SIZE_BYTES    = $MODEL_SIZE_BYTES"
@@ -225,6 +231,7 @@ REGISTER_JSON=$(jq -n \
   --arg mtype       "$MODEL_TYPE" \
   --arg fw          "$FRAMEWORK_TYPE" \
   --arg url         "$MODEL_URL" \
+  --arg allcfg      "$MODEL_ALL_CONFIG" \
   --argjson size    "$MODEL_SIZE_BYTES" \
   --argjson edim    "$EMBEDDING_DIM" '
   {
@@ -240,6 +247,7 @@ REGISTER_JSON=$(jq -n \
       model_type: $mtype,
       embedding_dimension: $edim,
       framework_type: $fw,
+      all_config: $allcfg
     },
     url: $url
   }')

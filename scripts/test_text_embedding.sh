@@ -11,6 +11,8 @@ OUTPUT="${OUTPUT:-output/embeddings/test_prediction.json}"
 OS_USER="${OS_USER:-}"
 OS_PASS="${OS_PASS:-}"
 
+echo "MODEL_ID: $MODEL_ID"
+
 curl_os() {
   if [[ -n "$OS_USER" && -n "$OS_PASS" ]]; then
     curl -sS -u "${OS_USER}:${OS_PASS}" "$@"
@@ -49,7 +51,10 @@ TEXTS=(
   "Embedding models map text into dense vectors."
 )
 
-payload=$(jq -n --arg t1 "${TEXTS[0]}" --arg t2 "${TEXTS[1]}" '{text_docs: [$t1, $t2], return_number: true, target_response: ["sentence_embedding"]}')
+# payload=$(jq -n --arg t1 "${TEXTS[0]}" --arg t2 "${TEXTS[1]}" '{text_docs: [$t1, $t2], return_number: true, target_response: ["sentence_embedding"]}')
+
+payload=$(jq -n --arg t1 "${TEXTS[0]}" --arg t2 "${TEXTS[1]}" '{text_docs: [$t1, $t2], return_number: true}')
+
 
 mkdir -p "$(dirname "$OUTPUT")"
 

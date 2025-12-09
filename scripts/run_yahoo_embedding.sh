@@ -37,7 +37,7 @@ echo "Looking for deployed TEXT_EMBEDDING model ..."
 #   echo "ERROR: 找不到已部署的 TEXT_EMBEDDING 模型，请先确认模型已经 register + deploy."
 #   exit 1
 # fi
-MODEL_ID="CK_V-5oBqcNfkKNSGkJE"
+MODEL_ID="NZv5AJsBCRwknejF5KfJ"
 
 echo "Found model_id: $MODEL_ID"
 

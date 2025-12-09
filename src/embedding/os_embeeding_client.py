@@ -33,11 +33,10 @@ class OpenSearchTextEmbedder:
         """调用 OpenSearch text_embedding 模型。"""
         url = f"{self.os_url}/_plugins/_ml/_predict/text_embedding/{self.model_id}"
 
-        # 与 setup/test 脚本保持一致，请求 sentence-level embedding
+        # 与 test_text_embedding.sh 保持一致：只设置 text_docs + return_number
         payload = {
             "text_docs": texts,
             "return_number": True,
-            "target_response": ["sentence_embedding"],
         }
 
         resp = requests.post(
@@ -67,8 +66,8 @@ class OpenSearchTextEmbedder:
 
         vectors: List[List[float]] = []
 
-        # 现在的调用使用 target_response=["sentence_embedding"]，
-        # 一般每个 inference_results[i].output[0] 就是 sentence_embedding。
+        # 删除 target_response 后，TEXT_EMBEDDING 可能按 batch 返回，
+        # 通常 inference_results[i].output[0] 即为该条的 embedding。
         for res in results:
             outputs = res.get("output") or []
             if not outputs:
@@ -83,11 +82,18 @@ class OpenSearchTextEmbedder:
                 # shape = [dim]
                 vectors.append(flat)
             elif len(shape) == 2:
-                # shape = [1, dim] 或 [batch, dim]，这里我们只支持第一种
+                # shape = [1, dim] 或 [batch, dim]
                 rows, dim = shape
-                if rows != 1:
+                if rows == 1:
+                    vectors.append(flat[:dim])
+                elif rows == expected_batch:
+                    # 一次返回整个 batch
+                    for i in range(rows):
+                        start = i * dim
+                        end = start + dim
+                        vectors.append(flat[start:end])
+                else:
                     raise RuntimeError(f"Unsupported batch shape: {shape}")
-                vectors.append(flat[:dim])
             else:
                 raise RuntimeError(f"Unsupported output shape: {shape}")
 
