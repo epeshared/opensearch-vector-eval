@@ -115,10 +115,15 @@ def main():
         for batch in batched(all_items, args.batch_size):
             ids, texts = zip(*batch)
             start = time.time()
-            vectors = embedder.embed(list(texts))
+            vectors, data_types = embedder.embed(list(texts), return_info=True)
             embed_time_total += time.time() - start
-            for _id, q, v in zip(ids, texts, vectors):
-                fout.write(json.dumps({"id": _id, "query": q, "embedding": v}) + "\n")
+            for _id, q, v, dtype in zip(ids, texts, vectors, data_types):
+                fout.write(json.dumps({
+                    "id": _id,
+                    "query": q,
+                    "embedding": v,
+                    "data_type": dtype,
+                }) + "\n")
                 total += 1
                 print_progress(total)
 

@@ -1,6 +1,6 @@
 # os/text_embedding_client.py
 
-from typing import List, Optional, Tuple, Any, Dict
+from typing import List, Optional, Tuple, Any, Dict, Union
 import requests
 
 
@@ -29,7 +29,9 @@ class OpenSearchTextEmbedder:
         self.headers = headers or {}
         self.verify_ssl = verify_ssl
 
-    def embed(self, texts: List[str]) -> List[List[float]]:
+    def embed(
+        self, texts: List[str], return_info: bool = False
+    ) -> Union[List[List[float]], Tuple[List[List[float]], List[Optional[str]]]]:
         """调用 OpenSearch text_embedding 模型。"""
         url = f"{self.os_url}/_plugins/_ml/_predict/text_embedding/{self.model_id}"
 
@@ -50,11 +52,16 @@ class OpenSearchTextEmbedder:
         resp.raise_for_status()
         data = resp.json()
 
-        return self._parse_embedding(data, len(texts))
+        vectors, data_types = self._parse_embedding(data, len(texts))
+        if return_info:
+            return vectors, data_types
+        return vectors
 
     @staticmethod
-    def _parse_embedding(data: Dict[str, Any], expected_batch: int):
-        """解析 OpenSearch text_embedding 响应结构，返回 sentence_embedding。"""
+    def _parse_embedding(
+        data: Dict[str, Any], expected_batch: int
+    ) -> Tuple[List[List[float]], List[Optional[str]]]:
+        """解析 OpenSearch text_embedding 响应结构和每条的 data_type。"""
 
         try:
             results = data["inference_results"]
@@ -65,6 +72,7 @@ class OpenSearchTextEmbedder:
             raise RuntimeError(f"Invalid response: {data}")
 
         vectors: List[List[float]] = []
+        data_types: List[Optional[str]] = []
 
         # 删除 target_response 后，TEXT_EMBEDDING 可能按 batch 返回。
         # 现在的模型会同时返回 input_ids / token_embeddings / sentence_embedding，
@@ -83,23 +91,27 @@ class OpenSearchTextEmbedder:
                 out = outputs[0]
             shape = out.get("shape")
             flat = out.get("data")
+            dtype = out.get("data_type")
             if not isinstance(shape, list) or not isinstance(flat, list):
                 raise RuntimeError(f"Invalid response: {data}")
 
             if len(shape) == 1:
                 # shape = [dim]
                 vectors.append(flat)
+                data_types.append(dtype)
             elif len(shape) == 2:
                 # shape = [1, dim] 或 [batch, dim]
                 rows, dim = shape
                 if rows == 1:
                     vectors.append(flat[:dim])
+                    data_types.append(dtype)
                 elif rows == expected_batch:
                     # 一次返回整个 batch
                     for i in range(rows):
                         start = i * dim
                         end = start + dim
                         vectors.append(flat[start:end])
+                        data_types.append(dtype)
                 else:
                     raise RuntimeError(f"Unsupported batch shape: {shape}")
             else:
@@ -110,4 +122,4 @@ class OpenSearchTextEmbedder:
                 f"Batch mismatch: expected {expected_batch}, got {len(vectors)}"
             )
 
-        return vectors
+        return vectors, data_types
