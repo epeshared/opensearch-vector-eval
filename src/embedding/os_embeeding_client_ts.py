@@ -66,21 +66,13 @@ class OpenSearchTextEmbedder:
 
         vectors: List[List[float]] = []
 
-        # 删除 target_response 后，TEXT_EMBEDDING 可能按 batch 返回。
-        # 现在的模型会同时返回 input_ids / token_embeddings / sentence_embedding，
-        # 我们优先选 name == "sentence_embedding"，否则退回第一个输出。
+        # 删除 target_response 后，TEXT_EMBEDDING 可能按 batch 返回，
+        # 通常 inference_results[i].output[0] 即为该条的 embedding。
         for res in results:
             outputs = res.get("output") or []
             if not outputs:
                 raise RuntimeError(f"Invalid response: {data}")
-
-            out = None
-            for o in outputs:
-                if o.get("name") == "sentence_embedding":
-                    out = o
-                    break
-            if out is None:
-                out = outputs[0]
+            out = outputs[0]
             shape = out.get("shape")
             flat = out.get("data")
             if not isinstance(shape, list) or not isinstance(flat, list):
